@@ -85,6 +85,8 @@ setCanvasRes();
 // ── MOBILE / RESPONSIVE SETUP ────────────────────────────────────────────────
 const IS_TOUCH=('ontouchstart' in window)||navigator.maxTouchPoints>0;
 if(IS_TOUCH)document.body.classList.add('touch-mobile');
+// Keep bottom HUD banners (peste/naked countdown) clear of the floating touch d-pad/button.
+const UIBOTTOM=IS_TOUCH?90:0;
 
 // Mobile: the canvas fills the entire screen edge-to-edge. Instead of scaling
 // a fixed 22x15-tile box down into a small letterboxed area, we recompute how
@@ -962,13 +964,13 @@ function render(){
     const secsLeft=Math.ceil(pl.pesteTimer/60);
     const timerRatio=Math.max(0,pl.pesteTimer/(60*60));
     const barCol=timerRatio>0.4?'#44ff44':timerRatio>0.2?'#ffee00':'#ff2200';
-    cx.fillStyle='rgba(0,0,0,0.72)';cx.fillRect(2,LH-22,LW-4,20);
-    cx.strokeStyle=barCol;cx.lineWidth=1;cx.strokeRect(2,LH-22,LW-4,20);
+    cx.fillStyle='rgba(0,0,0,0.72)';cx.fillRect(2,LH-22-UIBOTTOM,LW-4,20);
+    cx.strokeStyle=barCol;cx.lineWidth=1;cx.strokeRect(2,LH-22-UIBOTTOM,LW-4,20);
     const bw=LW-20;
-    cx.fillStyle='#1a1a1a';cx.fillRect(8,LH-12,bw,5);
-    cx.fillStyle=barCol;cx.fillRect(8,LH-12,Math.floor(bw*timerRatio),5);
+    cx.fillStyle='#1a1a1a';cx.fillRect(8,LH-12-UIBOTTOM,bw,5);
+    cx.fillStyle=barCol;cx.fillRect(8,LH-12-UIBOTTOM,Math.floor(bw*timerRatio),5);
     cx.fillStyle=barCol;cx.font='5px "Press Start 2P"';cx.textAlign='left';
-    cx.fillText(`☠ VENEREA  ${secsLeft}s`,8,LH-14);
+    cx.fillText(`☠ VENEREA  ${secsLeft}s`,8,LH-14-UIBOTTOM);
     // Urgency flash in last 15s
     if(secsLeft<=15&&Math.floor(fr/8)%2===0){
       cx.fillStyle='rgba(180,0,0,0.14)';cx.fillRect(0,0,LW,LH);
@@ -1007,13 +1009,13 @@ function render(){
     }
     // Timer bar at bottom
     const barCol2=ratio>0.4?`hsl(${hue},100%,60%)`:ratio>0.2?'#ffee00':'#ff2200';
-    cx.fillStyle='rgba(0,0,0,0.72)';cx.fillRect(2,LH-22,LW-4,20);
-    cx.strokeStyle=barCol2;cx.lineWidth=1;cx.strokeRect(2,LH-22,LW-4,20);
+    cx.fillStyle='rgba(0,0,0,0.72)';cx.fillRect(2,LH-22-UIBOTTOM,LW-4,20);
+    cx.strokeStyle=barCol2;cx.lineWidth=1;cx.strokeRect(2,LH-22-UIBOTTOM,LW-4,20);
     const bw2=LW-20;
-    cx.fillStyle='#222';cx.fillRect(8,LH-12,bw2,5);
-    cx.fillStyle=barCol2;cx.fillRect(8,LH-12,Math.floor(bw2*ratio),5);
+    cx.fillStyle='#222';cx.fillRect(8,LH-12-UIBOTTOM,bw2,5);
+    cx.fillStyle=barCol2;cx.fillRect(8,LH-12-UIBOTTOM,Math.floor(bw2*ratio),5);
     cx.fillStyle=`hsl(${hue},100%,70%)`;cx.font='5px "Press Start 2P"';cx.textAlign='left';
-    cx.fillText(`🔥 EN PELOTAS  ${secsLeft}s  x2 pts`,8,LH-14);
+    cx.fillText(`🔥 EN PELOTAS  ${secsLeft}s  x2 pts`,8,LH-14-UIBOTTOM);
     if(secsLeft<=10&&Math.floor(fr/6)%2===0){
       cx.fillStyle='rgba(255,200,0,0.10)';cx.fillRect(0,0,LW,LH);
     }
@@ -1033,8 +1035,10 @@ function render(){
      '☠ 10% tienen la PESTE (invisible!)','💊 Si te infectas: busca la pastilla'].forEach((t,i)=>cx.fillText(t,LW/2,ry+i*13));
     const ly=ry+76;cx.fillStyle='#999';cx.fillText('Colores:',LW/2,ly);
     COLS.forEach((c,i)=>{const bx=LW/2-38+i*20;cx.fillStyle=CM[c];cx.fillRect(bx,ly+4,10,10);cx.fillStyle='#fff';cx.font='4px "Press Start 2P"';cx.fillText(c[0].toUpperCase(),bx+3,ly+12);});
-    cx.fillStyle=fr%40<20?'#ffee44':'#aa8800';cx.font='6px "Press Start 2P"';cx.textAlign='center';
-    cx.fillText('▶  ENTER para empezar  ◀',LW/2,LH-12);
+    if(!IS_TOUCH){
+      cx.fillStyle=fr%40<20?'#ffee44':'#aa8800';cx.font='6px "Press Start 2P"';cx.textAlign='center';
+      cx.fillText('▶  ENTER para empezar  ◀',LW/2,LH-12);
+    }
     if(jp('Enter')||jp(' '))initGame();
   }
   // GAME OVER

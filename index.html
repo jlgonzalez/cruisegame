@@ -147,7 +147,7 @@ function genWorld(){
   for(let p=0;p<5;p++){const px=3+Math.floor(Math.random()*(WC-6));for(let y=1;y<WR-1;y++)if(world[y][px]===T_TREE&&Math.random()<0.7)world[y][px]=T_GRASS;}
   for(let i=0;i<160;i++){const x=1+Math.floor(Math.random()*(WC-2)),y=1+Math.floor(Math.random()*(WR-2));if(world[y][x]===T_GRASS)world[y][x]=T_BUSH;}
 }
-function walk(tx,ty,nakedMode=false){if(tx<0||tx>=WC||ty<0||ty>=WR)return false;if(nakedMode)return true;return world[ty][tx]!==T_TREE;}
+function walk(tx,ty,nakedMode=false){if(tx<0||tx>=WC||ty<0||ty>=WR)return false;if(nakedMode)return true;const t=world[ty][tx];return t!==T_TREE&&t!==T_BUSH;}
 
 // ── COLORS ────────────────────────────────────────────────────────────────────
 const COLS=['red','blue','green','yellow'];
@@ -418,22 +418,17 @@ function drawTile(tx,ty,ox,oy){
     cx.beginPath();cx.ellipse(bx-2.5,by-3,3,2.1,0,0,Math.PI*2);cx.fillStyle='#1c4f26';cx.fill();
     if((tx+ty)%4===0){cx.fillStyle='#d92f2f';cx.fillRect(bx-5,by,2,2);cx.fillRect(bx+3,by-4,2,2);}
   }else if(t===T_TREE){
-    // trunk
+    // trunk — sized so a sliver always peeks out under the canopy
     cx.fillStyle='#3a220f';cx.fillRect(px+6,py+11,4,5);
     cx.fillStyle='#6b4420';cx.fillRect(px+7,py+11,2,5);
     cx.fillStyle='#22140a';cx.fillRect(px+6,py+11,1,5);
-    // canopy — bubbly scalloped silhouette (ring of small overlapping bubbles)
-    // instead of one smooth outline, so trees read differently from the round bushes
-    const cxp=px+8,cyp=py+6;
-    cx.fillStyle='#0d3512';
-    const bubbles=[[0,-7.5,3.4],[5.2,-4.6,3.3],[6.6,0.8,3.2],[4.2,5.4,3.1],[-1,7.2,3.2],[-5.8,4.6,3.1],[-7,-0.6,3.2],[-4.6,-5.6,3.2],[1.6,-4.8,3]];
-    for(const[dx,dy,r]of bubbles){cx.beginPath();cx.arc(cxp+dx,cyp+dy,r,0,Math.PI*2);cx.fill();}
-    cx.beginPath();cx.ellipse(cxp,cyp+1,6.4,6,0,0,Math.PI*2);cx.fill();
-    // inner shading layers, smaller so the bubbly dark rim stays visible
-    cx.beginPath();cx.ellipse(cxp,cyp,5.6,5.3,0,0,Math.PI*2);cx.fillStyle='#155323';cx.fill();
-    cx.beginPath();cx.ellipse(cxp-0.5,cyp-1,4.4,4.2,0,0,Math.PI*2);cx.fillStyle='#1f6f2e';cx.fill();
-    cx.beginPath();cx.ellipse(cxp-2,cyp-2.2,2.8,2.5,0,0,Math.PI*2);cx.fillStyle='#31923c';cx.fill();
-    cx.beginPath();cx.ellipse(cxp-3,cyp-3.6,1.3,1,0,0,Math.PI*2);cx.fillStyle='#5cc250';cx.fill();
+    // canopy — smooth layered rounded blobs, classic SNES round-tree silhouette
+    const cxp=px+8,cyp=py+5;
+    cx.beginPath();cx.ellipse(cxp,cyp+1,8,7,0,0,Math.PI*2);cx.fillStyle='#0d3512';cx.fill();
+    cx.beginPath();cx.ellipse(cxp,cyp,7,6.2,0,0,Math.PI*2);cx.fillStyle='#155323';cx.fill();
+    cx.beginPath();cx.ellipse(cxp-0.5,cyp-1,5.6,5,0,0,Math.PI*2);cx.fillStyle='#1f6f2e';cx.fill();
+    cx.beginPath();cx.ellipse(cxp-2,cyp-2.3,3.2,2.7,0,0,Math.PI*2);cx.fillStyle='#31923c';cx.fill();
+    cx.beginPath();cx.ellipse(cxp-3,cyp-3.7,1.4,1.1,0,0,Math.PI*2);cx.fillStyle='#5cc250';cx.fill();
   }
 }
 

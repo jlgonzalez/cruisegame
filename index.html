@@ -18,6 +18,9 @@
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
 html,body{background:#060e06;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;min-height:100dvh;font-family:'Press Start 2P',monospace;overflow:hidden;overscroll-behavior:none;touch-action:none;position:fixed;width:100%;height:100%;}
 #shell{display:flex;flex-direction:column;border:3px solid #2a6a2a;box-shadow:0 0 50px #00aa0044,0 0 100px #00660022,inset 0 0 8px #00ff0011;max-width:100vw;max-height:100dvh;}
+#loading{display:none;color:#66cc33;font-family:'Press Start 2P',monospace;font-size:10px;}
+body.loading #loading{display:block;}
+body.loading #shell,body.loading #touch-ui{display:none;}
 canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none;}
 #hud{background:#050e05;border-top:2px solid #1a5a1a;padding:6px 14px;display:flex;justify-content:space-between;align-items:center;color:#66cc33;font-size:7px;letter-spacing:0.5px;gap:12px;flex-wrap:wrap;}
 /* ── MOBILE: game fills the whole screen, HUD/controls float as translucent overlays ── */
@@ -48,7 +51,8 @@ canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;touch
 .touch-mobile.show-start #a-start{display:block;}
 </style>
 </head>
-<body>
+<body class="loading">
+<div id="loading">Cargando…</div>
 <div id="shell">
   <canvas id="c"></canvas>
   <div id="hud">
@@ -83,6 +87,25 @@ function setCanvasRes(){
   cx.setTransform(1,0,0,1,0,0);cx.scale(SC,SC);cx.imageSmoothingEnabled=false;
 }
 setCanvasRes();
+
+// ── SPRITES ───────────────────────────────────────────────────────────────────
+// All art lives in editable PNG sprite sheets under assets/ (see assets/README.md
+// for the grid layout of each one) instead of being drawn with canvas shapes.
+const CHAR_PAD_TOP=2; // characters are drawn 18px tall (16 + 2px headroom for hair/hats)
+const SPRITE_FILES={
+  tiles:'assets/tiles.png', player:'assets/player.png', playerNaked:'assets/player_naked.png',
+  cop:'assets/cop.png', sado:'assets/sado.png', npcs:'assets/npcs.png', items:'assets/items.png',
+};
+const SPR={};
+let spritesReady=0;
+const SPRITE_COUNT=Object.keys(SPRITE_FILES).length;
+Object.entries(SPRITE_FILES).forEach(([key,src])=>{
+  const img=new Image();
+  img.onload=()=>{spritesReady++;};
+  img.src=src;
+  SPR[key]=img;
+});
+function spritesLoaded(){return spritesReady>=SPRITE_COUNT;}
 
 // ── MOBILE / RESPONSIVE SETUP ────────────────────────────────────────────────
 const IS_TOUCH=('ontouchstart' in window)||navigator.maxTouchPoints>0;
@@ -398,52 +421,20 @@ function initGame(){
   gs='playing';startBgMusic('normal');hud();
 }
 
-// ── TILE DRAW (SNES "A Link to the Past"-style overworld) ────────────────────
-const GP=['#3f9142','#469645','#3c8a3c','#4c9e4f']; // saturated ALTTP-style grass greens
+// ── TILE DRAW — reads from assets/tiles.png (6 cells: grass0-3, bush, tree) ───
 function drawTile(tx,ty,ox,oy){
   const t=world[ty][tx],px=tx*TILE-ox,py=ty*TILE-oy,v=(tx*13+ty*7)&3;
-  cx.fillStyle=GP[v];cx.fillRect(px,py,TILE,TILE);
-  if(t===T_GRASS){
-    // soft diagonal weave shading, like the ALTTP light-woods grass tile
-    if(v&1){cx.fillStyle='rgba(20,60,10,0.10)';cx.fillRect(px,py,TILE,TILE);}
-    if((tx^ty)%5===0){cx.fillStyle='#2c6e2a';cx.fillRect(px+2,py+5,1,4);cx.fillRect(px+7,py+3,1,5);cx.fillRect(px+12,py+7,1,3);}
-    if((tx*3+ty)%9===0){cx.fillStyle='#6fce5a';cx.fillRect(px+5,py+8,2,2);cx.fillRect(px+9,py+4,1,2);}
-    if((tx*5+ty*2)%17===0){cx.fillStyle='#e8e858';cx.fillRect(px+10,py+10,1,1);cx.fillStyle='#ffffff';cx.fillRect(px+4,py+11,1,1);}
-  }else if(t===T_BUSH){
-    // rounded, layered canopy blobs — deep dark-green tone, clearly darker/more muted than trees
-    const bx=px+8,by=py+9;
-    cx.beginPath();cx.ellipse(bx,by,8,6.2,0,0,Math.PI*2);cx.fillStyle='#06170a';cx.fill();
-    cx.beginPath();cx.ellipse(bx,by-1,7,5.4,0,0,Math.PI*2);cx.fillStyle='#0c2914';cx.fill();
-    cx.beginPath();cx.ellipse(bx-1,by-2,5.4,4,0,0,Math.PI*2);cx.fillStyle='#133a1c';cx.fill();
-    cx.beginPath();cx.ellipse(bx-2.5,by-3,3,2.1,0,0,Math.PI*2);cx.fillStyle='#1c4f26';cx.fill();
-    if((tx+ty)%4===0){cx.fillStyle='#d92f2f';cx.fillRect(bx-5,by,2,2);cx.fillRect(bx+3,by-4,2,2);}
-  }else if(t===T_TREE){
-    // trunk — sized so a sliver always peeks out under the canopy
-    cx.fillStyle='#3a220f';cx.fillRect(px+6,py+11,4,5);
-    cx.fillStyle='#6b4420';cx.fillRect(px+7,py+11,2,5);
-    cx.fillStyle='#22140a';cx.fillRect(px+6,py+11,1,5);
-    // canopy — smooth layered rounded blobs, classic SNES round-tree silhouette
-    const cxp=px+8,cyp=py+5;
-    cx.beginPath();cx.ellipse(cxp,cyp+1,8,7,0,0,Math.PI*2);cx.fillStyle='#0d3512';cx.fill();
-    cx.beginPath();cx.ellipse(cxp,cyp,7,6.2,0,0,Math.PI*2);cx.fillStyle='#155323';cx.fill();
-    cx.beginPath();cx.ellipse(cxp-0.5,cyp-1,5.6,5,0,0,Math.PI*2);cx.fillStyle='#1f6f2e';cx.fill();
-    cx.beginPath();cx.ellipse(cxp-2,cyp-2.3,3.2,2.7,0,0,Math.PI*2);cx.fillStyle='#31923c';cx.fill();
-    cx.beginPath();cx.ellipse(cxp-3,cyp-3.7,1.4,1.1,0,0,Math.PI*2);cx.fillStyle='#5cc250';cx.fill();
-  }
+  const col=t===T_GRASS?v:t===T_BUSH?4:5;
+  cx.drawImage(SPR.tiles,col*TILE,0,TILE,TILE,px,py,TILE,TILE);
 }
 
-// ── CONDOM ────────────────────────────────────────────────────────────────────
+// ── CONDOM — column = color index in COLS, from assets/items.png ─────────────
 function drawCondom(it,ox,oy){
   const px=it.tx*TILE-ox,py=it.ty*TILE-oy,b=Math.round(Math.sin(it.bob*0.06)*1.2);it.bob++;
-  cx.fillStyle=CD[it.color];cx.fillRect(px+5,py+3+b,6,10);
-  cx.fillStyle=CM[it.color];cx.fillRect(px+5,py+3+b,6,9);
-  cx.fillStyle='#ffffff55';cx.fillRect(px+6,py+4+b,2,3);
-  cx.fillStyle=CD[it.color];cx.fillRect(px+5,py+3+b,6,1);cx.fillRect(px+5,py+11+b,6,1);
-  cx.fillStyle='#ffffff22';cx.fillRect(px+5,py+3+b,1,9);
-  cx.fillStyle=CD[it.color];cx.font='4px monospace';cx.textAlign='center';cx.fillText('♥',px+8,py+8+b);
+  cx.drawImage(SPR.items,COLS.indexOf(it.color)*TILE,0,TILE,TILE,px,py+b,TILE,TILE);
 }
 
-// ── PILL ──────────────────────────────────────────────────────────────────────
+// ── PILL — glow stays code-drawn (animated), icon is column 4 of items.png ───
 function drawPill(ox,oy){
   if(!pill)return;
   const px=pill.tx*TILE-ox,py=pill.ty*TILE-oy;
@@ -452,36 +443,15 @@ function drawPill(ox,oy){
   const gl=Math.abs(Math.sin(pill.bob*0.05));
   cx.fillStyle=`rgba(255,160,0,${0.14+gl*0.18})`;cx.fillRect(px-4,py-3+b,24,22);
   cx.fillStyle=`rgba(255,255,200,${0.06+gl*0.1})`;cx.fillRect(px-2,py-1+b,20,18);
-  // Orange left half
-  cx.fillStyle='#ff6622';cx.fillRect(px+3,py+5+b,5,8);cx.fillRect(px+4,py+4+b,3,1);cx.fillRect(px+4,py+12+b,3,1);
-  cx.fillStyle='#ff4400';cx.fillRect(px+3,py+5+b,1,8);cx.fillStyle='#ff8844';cx.fillRect(px+4,py+5+b,1,3);
-  // White right half
-  cx.fillStyle='#eeeeee';cx.fillRect(px+8,py+5+b,5,8);cx.fillRect(px+9,py+4+b,3,1);cx.fillRect(px+9,py+12+b,3,1);
-  cx.fillStyle='#cccccc';cx.fillRect(px+12,py+5+b,1,8);cx.fillStyle='#ffffff';cx.fillRect(px+8,py+5+b,1,4);
-  // Divider & cross
-  cx.fillStyle='rgba(0,0,0,0.35)';cx.fillRect(px+8,py+4+b,1,9);
-  cx.fillStyle='rgba(200,0,0,0.5)';cx.fillRect(px+6,py+5+b,2,8);cx.fillRect(px+4,py+7+b,6,2);
-  cx.fillStyle='#ffffff';cx.font='5px sans-serif';cx.textAlign='center';cx.fillText('💊',px+8,py+b-1);
+  cx.drawImage(SPR.items,4*TILE,0,TILE,TILE,px,py+b,TILE,TILE);
 }
 
-// ── NPC SPRITE ────────────────────────────────────────────────────────────────
+// ── NPC SPRITE — column = color index in COLS, from assets/npcs.png ──────────
 function drawNPCSprite(px,py,color){
   cx.fillStyle=CM[color]+'22';cx.fillRect(px-2,py-2,20,20);
   cx.fillStyle=CM[color]+'11';cx.fillRect(px-4,py-4,24,24);
-  cx.fillStyle='rgba(0,0,0,0.22)';cx.fillRect(px+3,py+14,10,2);
-  cx.fillStyle='#221100';cx.fillRect(px+3,py+14,4,2);cx.fillRect(px+9,py+14,4,2);
-  cx.fillStyle='#6e4c22';cx.fillRect(px+4,py+10,3,4);cx.fillRect(px+9,py+10,3,4);
-  cx.fillStyle='rgba(15,10,5,0.5)';cx.fillRect(px+2,py+5,12,7);
-  cx.fillStyle='#9a7044';cx.fillRect(px+3,py+6,10,5);
-  cx.fillStyle=CM[color];cx.fillRect(px+3,py+6,5,5);
-  cx.fillStyle=CD[color];cx.fillRect(px+3,py+6,5,1);cx.fillRect(px+3,py+10,5,1);cx.fillRect(px+3,py+6,1,5);cx.fillRect(px+7,py+6,1,5);
-  cx.fillStyle='#c8905a';cx.fillRect(px+1,py+7,2,3);cx.fillRect(px+13,py+7,2,3);
-  cx.fillStyle='rgba(15,10,5,0.5)';cx.fillRect(px+3,py,10,9);
-  cx.fillStyle='#c8905a';cx.fillRect(px+4,py+1,8,7);
-  const hc={red:'#cc1100',blue:'#003399',green:'#006622',yellow:'#887700'};
-  cx.fillStyle=hc[color];cx.fillRect(px+4,py,8,3);cx.fillRect(px+3,py+1,2,2);cx.fillRect(px+11,py+1,2,2);
-  cx.fillStyle='#111';cx.fillRect(px+5,py+4,2,2);cx.fillRect(px+9,py+4,2,2);
-  cx.fillStyle='#a05040';cx.fillRect(px+6,py+7,4,1);cx.fillRect(px+5,py+7,1,1);cx.fillRect(px+10,py+7,1,1);
+  const col=COLS.indexOf(color);
+  cx.drawImage(SPR.npcs,col*TILE,0,TILE,18,px,py-CHAR_PAD_TOP,TILE,18);
 }
 function drawNPC(npc,ox,oy){
   const px=npc.tx*TILE-ox,py=npc.ty*TILE-oy;
@@ -492,104 +462,37 @@ function drawNPC(npc,ox,oy){
   cx.fillStyle='#fff8';cx.fillRect(px+5,py-3+b,6,1);
 }
 
-// ── PLAYER SPRITE ─────────────────────────────────────────────────────────────
+// ── PLAYER SPRITE — 4 dirs (up,right,down,left) x 2 walk frames ──────────────
+// from assets/player.png / assets/player_naked.png (dressed/naked variant).
 function drawPlayerSprite(px,py,dir,held,inv,hasPeste,naked,walkFr){
   if(inv>0&&Math.floor(inv/4)%2===1)return;
   const S=Math.floor(walkFr/7)%2; // 0 or 1 step phase
-  // shadow
-  cx.fillStyle='rgba(0,0,0,0.22)';cx.fillRect(px+3,py+14,10,2);
-  // shoes — alternate each step
-  cx.fillStyle=naked?'#c8905a':'#111';
-  cx.fillRect(px+3,py+14,4,2);
-  cx.fillRect(S?px+9:px+8,S?py+14:py+13,4,2);
-  // legs — swing animation
-  const legCol=naked?'#c8905a':'#2a4a8a';
-  cx.fillStyle=legCol;
-  cx.fillRect(px+4,py+10,3,4);
-  cx.fillRect(px+9,S?py+9:py+10,3,S?5:4);
-  // outline (SNES-style dark silhouette pop)
-  cx.fillStyle='rgba(15,10,5,0.5)';cx.fillRect(px+2,py+5,12,7);
-  // body
-  cx.fillStyle=naked?'#c8905a':(hasPeste?'#4a7a2a':(held?CM[held]:'#7a5028'));
-  cx.fillRect(px+3,py+6,10,5);
-  // held condom (if dressed)
+  const sheet=naked?SPR.playerNaked:SPR.player;
+  cx.drawImage(sheet,(dir*2+S)*TILE,0,TILE,18,px,py-CHAR_PAD_TOP,TILE,18);
+  // held condom (if dressed) — small overlay near the hand, from items.png
   if(held&&!naked){
-    cx.fillStyle=CD[held];cx.fillRect(px+13,py+7,3,6);
-    cx.fillStyle=CM[held];cx.fillRect(px+13,py+7,3,5);
-    cx.fillStyle='#ffffff44';cx.fillRect(px+13,py+7,1,3);
-  }
-  // arms
-  cx.fillStyle='#c8905a';cx.fillRect(px+1,py+7,2,3);cx.fillRect(px+13,py+7,2,3);
-  // head (flesh)
-  cx.fillStyle='rgba(15,10,5,0.5)';cx.fillRect(px+3,py,10,9);
-  cx.fillStyle='#c8905a';cx.fillRect(px+4,py+1,8,7);
-  // hair — only on top, no full-head overlay
-  if(!naked){
-    cx.fillStyle='#2a1808';
-    cx.fillRect(px+4,py,8,3);      // top hair
-    cx.fillRect(px+3,py+1,2,2);   // left sideburn
-    cx.fillRect(px+11,py+1,2,2);  // right sideburn
-  }else{
-    // naked: spiky wild hair, sun-kissed
-    cx.fillStyle='#1a0e04';
-    cx.fillRect(px+4,py,8,2);
-    cx.fillRect(px+3,py,1,1);cx.fillRect(px+12,py,1,1); // spikes out
-    cx.fillRect(px+5,py-1,2,1);cx.fillRect(px+9,py-1,2,1); // top spikes
-  }
-  // eyes — direction-aware, no full head repaint
-  cx.fillStyle='#111';
-  if(dir===2){
-    cx.fillRect(px+5,py+4,2,2);cx.fillRect(px+9,py+4,2,2); // front eyes
-  }else if(dir===0){
-    // facing away: show back of head only, no eyes visible
-    cx.fillStyle='#c8905a';cx.fillRect(px+4,py+1,8,5); // back of head (already drawn)
-    if(!naked){cx.fillStyle='#2a1808';cx.fillRect(px+4,py+1,8,2);} // hair at nape
-  }else if(dir===1){
-    cx.fillRect(px+9,py+4,2,2); // right side eye
-  }else{
-    cx.fillRect(px+5,py+4,2,2); // left side eye
+    cx.drawImage(SPR.items,COLS.indexOf(held)*TILE,0,TILE,TILE,px+11,py+4,9,11);
   }
   if(hasPeste){cx.fillStyle='rgba(60,200,60,0.28)';cx.fillRect(px+4,py+1,8,6);}
-  // Naked: rosy cheeks
-  if(naked){cx.fillStyle='#ff8888';cx.fillRect(px+5,py+5,2,1);cx.fillRect(px+9,py+5,2,1);}
 }
 function drawPlayer(ox,oy){
   drawPlayerSprite(pl.x-ox,pl.y-oy,pl.dir,pl.held,pl.inv,pl.hasPeste,pl.naked,pl.walking?fr:0);
 }
 
-// ── COP ───────────────────────────────────────────────────────────────────────
+// ── COP — 2 walk frames from assets/cop.png ───────────────────────────────────
 function drawCop(cop,ox,oy){
   const px=cop.x-ox,py=cop.y-oy,S=cop.st,mv=cop.moving;
   const dist=Math.hypot(pl.x-cop.x,pl.y-cop.y);
   if(dist<50&&Math.floor(fr/5)%2===0){cx.fillStyle='#ff000022';cx.fillRect(px-2,py-2,20,20);}
-  // shadow
-  cx.fillStyle='rgba(0,0,0,0.22)';cx.fillRect(px+3,py+14,10,2);
-  // shoes — alternate step
-  cx.fillStyle='#111';
-  cx.fillRect(px+3,py+14,4,2);
-  cx.fillRect(mv&&S?px+9:px+8,mv&&S?py+14:py+13,4,2);
-  // legs — swing
-  cx.fillStyle='#1a3399';
-  cx.fillRect(px+4,py+10,3,4);
-  cx.fillRect(px+9,mv&&S?py+9:py+10,3,mv&&S?5:4);
-  cx.fillStyle='rgba(5,10,25,0.5)';cx.fillRect(px+2,py+5,12,7);
-  cx.fillStyle='#2244cc';cx.fillRect(px+3,py+6,10,5);
-  cx.fillStyle='#ffdd22';cx.fillRect(px+9,py+7,3,3);cx.fillStyle='#ccaa00';cx.fillRect(px+10,py+8,1,1);
-  cx.fillStyle='#080808';cx.fillRect(px+3,py+10,10,1);cx.fillStyle='#333';cx.fillRect(px+4,py+10,2,2);
-  cx.fillStyle='#2244cc';cx.fillRect(px+1,py+7,2,3);cx.fillRect(px+13,py+7,2,3);
-  cx.fillStyle='rgba(5,10,25,0.5)';cx.fillRect(px+3,py+2,10,8);
-  cx.fillStyle='#c8905a';cx.fillRect(px+4,py+3,8,6);
-  cx.fillStyle='#132277';cx.fillRect(px+3,py+1,10,3);cx.fillStyle='#1a2f99';cx.fillRect(px+2,py+3,12,2);
-  cx.fillStyle='#2a3eaa';cx.fillRect(px+4,py+1,8,2);cx.fillStyle='#ffdd22';cx.fillRect(px+7,py+2,2,1);
-  cx.fillStyle='#111';cx.fillRect(px+5,py+5,2,2);cx.fillRect(px+9,py+5,2,2);
-  cx.fillStyle='#993322';cx.fillRect(px+6,py+8,4,1);
+  const frame=(mv&&S)?1:0;
+  cx.drawImage(SPR.cop,frame*TILE,0,TILE,18,px,py-CHAR_PAD_TOP,TILE,18);
   if((pl.hasPeste||pl.naked)&&Math.floor(fr/6)%2===0){
     cx.fillStyle=Math.floor(fr/6)%4<2?'#ff2200':'#0033ff';
     cx.fillRect(px+5,py-2,3,2);cx.fillRect(px+8,py-2,3,2);
   }
 }
 
-// ── SADO SPRITE ───────────────────────────────────────────────────────────────
+// ── SADO — 2 walk frames from assets/sado.png ─────────────────────────────────
 function drawSado(ox,oy){
   if(!sado)return;
   const px=sado.x-ox,py=sado.y-oy;
@@ -598,38 +501,8 @@ function drawSado(ox,oy){
   // Danger glow — red aura
   cx.fillStyle='rgba(180,0,0,0.12)';cx.fillRect(px-4,py-4,24,24);
   if(sado.chasing){cx.fillStyle='rgba(220,0,0,0.18)';cx.fillRect(px-6,py-6,28,28);}
-  // shadow
-  cx.fillStyle='rgba(0,0,0,0.22)';cx.fillRect(px+3,py+14,10,2);
-  // boots — black, chunky
-  cx.fillStyle='#111';
-  cx.fillRect(px+2,py+13,5,3);
-  cx.fillRect(mv&&S?px+9:px+8,mv&&S?py+12:py+13,5,3);
-  // legs — leather pants black
-  cx.fillStyle='#1a1a1a';
-  cx.fillRect(px+3,py+9,4,5);
-  cx.fillRect(px+9,mv&&S?py+8:py+9,4,mv&&S?6:5);
-  // outline
-  cx.fillStyle='rgba(10,5,5,0.5)';cx.fillRect(px+2,py+4,12,7);
-  // body — flesh (naked torso)
-  cx.fillStyle='#d4956a';cx.fillRect(px+3,py+5,10,5);
-  // leather harness straps
-  cx.fillStyle='#0a0a0a';
-  cx.fillRect(px+3,py+5,2,5);   // left strap
-  cx.fillRect(px+11,py+5,2,5);  // right strap
-  cx.fillRect(px+3,py+7,10,2);  // horizontal strap
-  cx.fillStyle='#333';cx.fillRect(px+7,py+7,2,2); // buckle
-  // arms — flesh
-  cx.fillStyle='#d4956a';cx.fillRect(px+0,py+6,3,4);cx.fillRect(px+13,py+6,3,4);
-  // leather wristbands
-  cx.fillStyle='#0a0a0a';cx.fillRect(px+0,py+8,3,2);cx.fillRect(px+13,py+8,3,2);
-  // head — flesh
-  cx.fillStyle='#d4956a';cx.fillRect(px+4,py+1,8,6);
-  // LEATHER MASK — full black with eye holes
-  cx.fillStyle='#0d0d0d';cx.fillRect(px+3,py,10,7);
-  cx.fillStyle='#d4956a';cx.fillRect(px+5,py+2,2,2);cx.fillRect(px+9,py+2,2,2); // eye holes
-  cx.fillStyle='#ff2200';cx.fillRect(px+6,py+2,1,1);cx.fillRect(px+10,py+2,1,1); // red pupils
-  cx.fillStyle='#0d0d0d';cx.fillRect(px+5,py+5,6,2); // gag/mouth cover
-  cx.fillStyle='#222';cx.fillRect(px+3,py,1,7);cx.fillRect(px+12,py,1,7); // mask sides
+  const frame=(mv&&S)?1:0;
+  cx.drawImage(SPR.sado,frame*TILE,0,TILE,18,px,py-CHAR_PAD_TOP,TILE,18);
   // Chase indicator — exclamation
   if(sado.chasing){
     cx.fillStyle=fr%20<10?'#ff2200':'#ff8800';
@@ -637,27 +510,15 @@ function drawSado(ox,oy){
   }
 }
 
-// ── CLOTHES ITEM ──────────────────────────────────────────────────────────────
+// ── CLOTHES ITEM — column 5 of assets/items.png ───────────────────────────────
 function drawClothes(ox,oy){
   if(!clothes)return;
   const px=clothes.tx*TILE-ox,py=clothes.ty*TILE-oy;
   if(px<-TILE||px>LW||py<-TILE||py>LH)return;
   const b=Math.round(Math.sin(clothes.bob*0.08)*1.5);clothes.bob++;
-  // Glow
   cx.fillStyle=`rgba(255,200,100,${0.12+0.08*Math.abs(Math.sin(clothes.bob*0.05))})`;
   cx.fillRect(px-2,py-2+b,20,20);
-  // T-shirt — white with collar
-  cx.fillStyle='#dddddd';cx.fillRect(px+2,py+5+b,12,9);
-  cx.fillStyle='#eeeeee';cx.fillRect(px+3,py+4+b,10,2); // shoulders
-  // Sleeves
-  cx.fillStyle='#dddddd';cx.fillRect(px,py+5+b,3,5);cx.fillRect(px+13,py+5+b,3,5);
-  // Collar
-  cx.fillStyle='#bbbbbb';cx.fillRect(px+5,py+4+b,6,2);cx.fillRect(px+6,py+3+b,4,2);
-  // Shirt details
-  cx.fillStyle='#cccccc';cx.fillRect(px+7,py+6+b,1,5);  // center line
-  cx.fillRect(px+5,py+8+b,2,1);cx.fillRect(px+9,py+8+b,2,1); // pocket hint
-  // Small ♥ label
-  cx.fillStyle='#aaaaff';cx.font='5px sans-serif';cx.textAlign='center';cx.fillText('👕',px+8,py+3+b);
+  cx.drawImage(SPR.items,5*TILE,0,TILE,TILE,px,py+b,TILE,TILE);
 }
 
 // ── SADO UPDATE ───────────────────────────────────────────────────────────────
@@ -739,7 +600,7 @@ function renderMatchAnim(){
   if(!matchAnim)return;
   const ox=matchAnim.ox,oy=matchAnim.oy;
   // World renders normally — no dark overlay
-  cx.fillStyle='#7a6830';cx.fillRect(0,0,LW,LH);
+  cx.fillStyle='#3c7838';cx.fillRect(0,0,LW,LH);
   const tx0=Math.floor(ox/TILE),ty0=Math.floor(oy/TILE);
   const tx1=Math.min(tx0+VW+1,WC),ty1=Math.min(ty0+VH+1,WR);
   for(let ty=ty0;ty<ty1;ty++)for(let tx=tx0;tx<tx1;tx++)drawTile(tx,ty,ox,oy);
@@ -1089,7 +950,11 @@ genWorld();
 pl={x:(WC>>1)*TILE,y:(WR>>1)*TILE,tx:WC>>1,ty:WR>>1,held:null,walking:false,inv:0,dir:2,sp:1.7,st:0,stT:0,hasPeste:false,venereaMsg:0,pesteTimer:0,naked:false,nakedTimer:0};
 cops=[];npcs=[];items=[];pill=null;pesteParticles=[];
 cam.x=pl.x-LW/2;cam.y=pl.y-LH/2;
-hud();loop();
+hud();
+(function waitForSprites(){
+  if(spritesLoaded()){document.body.classList.remove('loading');loop();return;}
+  requestAnimationFrame(waitForSprites);
+})();
 </script>
 </body>
 </html>

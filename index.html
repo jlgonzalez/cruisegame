@@ -168,7 +168,9 @@ function genWorld(){
     if(!(Math.abs(x-mx)<7&&Math.abs(y-my)<7)&&Math.random()<0.24)world[y][x]=T_TREE;
   for(let p=0;p<5;p++){const py=3+Math.floor(Math.random()*(WR-6));for(let x=1;x<WC-1;x++)if(world[py][x]===T_TREE&&Math.random()<0.7)world[py][x]=T_GRASS;}
   for(let p=0;p<5;p++){const px=3+Math.floor(Math.random()*(WC-6));for(let y=1;y<WR-1;y++)if(world[y][px]===T_TREE&&Math.random()<0.7)world[y][px]=T_GRASS;}
-  for(let i=0;i<160;i++){const x=1+Math.floor(Math.random()*(WC-2)),y=1+Math.floor(Math.random()*(WR-2));if(world[y][x]===T_GRASS)world[y][x]=T_BUSH;}
+  // Bushes are solid, so keep them out of the spawn clear zone too (like trees)
+  // or the player can end up boxed in — unable to move in any direction at all.
+  for(let i=0;i<160;i++){const x=1+Math.floor(Math.random()*(WC-2)),y=1+Math.floor(Math.random()*(WR-2));if(world[y][x]===T_GRASS&&!(Math.abs(x-mx)<7&&Math.abs(y-my)<7))world[y][x]=T_BUSH;}
 }
 function walk(tx,ty,nakedMode=false){if(tx<0||tx>=WC||ty<0||ty>=WR)return false;if(nakedMode)return true;const t=world[ty][tx];return t!==T_TREE&&t!==T_BUSH;}
 
